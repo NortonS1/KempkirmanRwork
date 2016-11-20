@@ -1,3 +1,5 @@
+##This is a qPCR foldchange caculator
+
 foldchange <- function(cnCT,tnCT,ctCT,ttCT){
   difc <- cnCT-ctCT
   dift <- tnCT-ttCT

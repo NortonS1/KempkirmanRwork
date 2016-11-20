@@ -2,6 +2,6 @@
 
 Samtoolsrun <- function(run){
     if(run == "run"){
-      shiny::runApp(appDir = getwd())
+      shiny::runApp(appDir = "/Users/kemplabadmin/Desktop/R Work/Samtools/R")
     }
   }
