@@ -1,7 +1,9 @@
 #SPADE!!!
 
-read.csv("Sample 1.csv") -> x
+read.csv("Sample 2.csv") -> x
 library(igraph)
+library(ggplot2)
+library(reshape2)
 
 SPADE <- function(x,k){
   
@@ -25,6 +27,17 @@ as.data.frame(big_data, row.names = c(clus_names)) -> cluster_means
 dist(cluster_means, method = "manhattan") -> distx1
 graph.adjacency(as.matrix(distx1),mode="undirected",weighted=TRUE) -> adjgraph
 minimum.spanning.tree(adjgraph) -> SPADEgraph
-tkplot(SPADEgraph)
+mypath2 <- file.path("~/Desktop","Lab R work","PUT FILES IN HERE","Images",paste("Network_", ".png", sep = ""))
+png(file = mypath2)
+plot(SPADEgraph)
+dev.off()
+
+for(i in 1:k){
+  mypath <- file.path("~/Desktop","Lab R work","PUT FILES IN HERE","Images",paste("phenotype_","cluster_", i, ".png", sep = ""))
+  png(file = mypath)
+  barplot(as.matrix(cluster_means[i,]), cex.names = 0.7)
+  dev.off()
+}
+
 }
 
