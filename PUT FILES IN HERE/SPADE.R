@@ -2,8 +2,6 @@
 
 read.csv("Sample 2.csv") -> x
 library(igraph)
-library(ggplot2)
-library(reshape2)
 
 SPADE <- function(x,k){
   
@@ -31,13 +29,12 @@ mypath2 <- file.path("~/Desktop","Lab R work","PUT FILES IN HERE","Images",paste
 png(file = mypath2)
 plot(SPADEgraph)
 dev.off()
-
+# Saving Phenotype data as bargraphs per cluster
 for(i in 1:k){
   mypath <- file.path("~/Desktop","Lab R work","PUT FILES IN HERE","Images",paste("phenotype_","cluster_", i, ".png", sep = ""))
   png(file = mypath)
   barplot(as.matrix(cluster_means[i,]), cex.names = 0.7)
   dev.off()
-}
-
+  }
 }
 
