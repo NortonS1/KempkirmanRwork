@@ -207,7 +207,8 @@ observeEvent(input$Tum, {
       
       output$heatmap <- renderPlot({
         
-      Heatmap(hts[,c(input$markers)], col = colorRamp2(c(-4, -2, 0, 2, 4),c("darkblue","cornflowerblue","white","chocolate1","firebrick")), input$heat1tit,
+      Heatmap(hts[,c(input$markers)], col = colorRamp2(c(-4, -2, 0, 2, 4),c("darkblue","cornflowerblue","white","chocolate1","firebrick")),
+              input$heat1tit,
               cluster_columns = input$ccol, cluster_rows = input$crow ,row_dend_width = unit(3,"cm"))
       
       })
