@@ -4,7 +4,7 @@ library(circlize)
 library(ComplexHeatmap)
 library(dendextend)
 setwd("~/Desktop/R work/PUT FILES IN HERE")
-read.csv("Sample 2.csv") -> s1
+read.csv("Sample 1.csv") -> s1
 apply(s1,2,mean) -> s1m
 apply(s1,2,sd) -> s1s
 scale(s1,s1m,s1s) -> s1scaled
@@ -38,14 +38,14 @@ SPADE <- function(x,k,mkrs){
   
   full_data = data.frame(cluster_means, cluster_abundance)
   # Heatmapping clusters for easy viewing
-  mypath4 <- file.path("~/Desktop","Lab R work","PUT FILES IN HERE",
+  mypath4 <- file.path("~/Desktop","R work","PUT FILES IN HERE",
                        "Images",paste("Heatmap_","cluster_", ".png", sep = ""))
   png(file = mypath4)
   heatmap(as.matrix(cluster_means), Colv = NA, col = My_Palette)
   dev.off()
   # Saving phenotypes as box and whisker graphs
   for(i in 1:k){
-    mypath3 <- file.path("~/Desktop","Lab R work","PUT FILES IN HERE",
+    mypath3 <- file.path("~/Desktop","R work","PUT FILES IN HERE",
                          "Images",paste("phenotype_","cluster_", i, ".png", sep = ""))
     png(file = mypath3, width = 1700, units = "px")
     phedat = data.frame(x[c(cut_x == i),])
@@ -57,13 +57,13 @@ SPADE <- function(x,k,mkrs){
   graph.adjacency(as.matrix(distx1),mode="undirected",weighted=TRUE) -> adjgraph
   SPADEgraph <-minimum.spanning.tree(adjgraph)
   V(SPADEgraph)$abundance <- full_data[,ncol(full_data)]
-  V(SPADEgraph)$size <- V(SPADEgraph)$abundance*0.7 
-  mypath2 <- file.path("~/Desktop","Lab R work","PUT FILES IN HERE",
+  V(SPADEgraph)$size <- (log10(V(SPADEgraph)$abundance))*10 
+  mypath2 <- file.path("~/Desktop","R work","PUT FILES IN HERE",
                        "Images",paste("Network_", ".png", sep = ""))
   png(file = mypath2)
-  plot(SPADEgraph)
+  plot(SPADEgraph, vertex.label.cex = 0.5)
   dev.off()
-  plot(SPADEgraph)
+  plot(SPADEgraph, vertex.label.cex = 0.5)
   }
 
 PHESPADE <- function(x,k,clus,mkrs2){
