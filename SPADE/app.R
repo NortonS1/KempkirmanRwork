@@ -4,7 +4,7 @@ library(circlize)
 library(ComplexHeatmap)
 library(dendextend)
 setwd("~/Desktop/R work/PUT FILES IN HERE")
-read.csv("Sample 1.csv") -> s1
+read.csv("Sample 2.csv") -> s1
 apply(s1,2,mean) -> s1m
 apply(s1,2,sd) -> s1s
 scale(s1,s1m,s1s) -> s1scaled
@@ -16,15 +16,27 @@ SPADE <- function(x,k,mkrs){
   hclust(distx) -> clus_x
   cutree(clus_x, k = k) ->cut_x
   datalist = list()
+  abundancedatalist = list()
   for(i in 1:k){
     dat = data.frame(colMeans(x[c(cut_x == i),mkrs]))
-    datalist[[i]] <- dat}
+    datalist[[i]] <- dat
+    abundancedat = data.frame(dim(x[c(cut_x == i),]))
+    abundancedatalist[[i]] <- abundancedat}
   #cleaning data and assigning to data frame
   big_data = do.call(cbind, datalist)
   big_data = t(big_data)
   clus_num <- c(1:k)
   clus_names <- as.character(clus_num)
   as.data.frame(big_data, row.names = c(clus_names)) -> cluster_means
+  
+  abd_data = do.call(cbind, abundancedatalist)
+  abd_data = t(abd_data)
+  clus_num <- c(1:k)
+  clus_names <- as.character(clus_num)
+  as.data.frame(abd_data, row.names = c(clus_names)) -> cluster_abundance
+  cluster_abundance[,1] -> cluster_abundance
+  
+  full_data = data.frame(cluster_means, cluster_abundance)
   # Heatmapping clusters for easy viewing
   mypath4 <- file.path("~/Desktop","Lab R work","PUT FILES IN HERE",
                        "Images",paste("Heatmap_","cluster_", ".png", sep = ""))
@@ -43,8 +55,9 @@ SPADE <- function(x,k,mkrs){
   #calculating cluster distances and plotting
   dist(cluster_means, method = "manhattan") -> distx1
   graph.adjacency(as.matrix(distx1),mode="undirected",weighted=TRUE) -> adjgraph
-  SPADEgraph <-minimum.spanning.tree(adjgraph) %>%
-    set_vertex_attr("color", value = "cornflowerblue")
+  SPADEgraph <-minimum.spanning.tree(adjgraph)
+  V(SPADEgraph)$abundance <- full_data[,ncol(full_data)]
+  V(SPADEgraph)$size <- V(SPADEgraph)$abundance*0.7 
   mypath2 <- file.path("~/Desktop","Lab R work","PUT FILES IN HERE",
                        "Images",paste("Network_", ".png", sep = ""))
   png(file = mypath2)
