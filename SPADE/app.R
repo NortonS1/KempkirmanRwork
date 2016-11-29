@@ -53,14 +53,14 @@ SPADE <- function(x,k,mkrs){
   plot(SPADEgraph)
   }
 
-PHESPADE <- function(x,k,clus,mkrs){
+PHESPADE <- function(x,k,clus,mkrs2){
   #initial clustering and binning 
   dist(x, method = "manhattan") -> distx
   hclust(distx) -> clus_x
   cutree(clus_x, k = k) ->cut_x
-  
+  # phenotype outputs based on user choice
   phedat = data.frame(x[c(cut_x == clus),])
-   boxplot.matrix(as.matrix(phedat[,c(mkrs)]), cex = 0.5, pch = 20, las = 2,
+   boxplot.matrix(as.matrix(phedat[,c(mkrs2)]), cex = 0.5, pch = 20, las = 2,
                    main = paste("cluster",clus, sep = " "))
   
   }
@@ -73,24 +73,22 @@ ui <- shinyUI(navbarPage(title = "SPADE",
                          tabPanel(title = "SPADE",
                                   sidebarLayout(
                                     sidebarPanel(
-                                      selectInput("mkrs", "Select which markers to assess", c(colnames(s1)), multiple = TRUE ),
+                                      selectInput("mkrs", "Select which markers to cluster", c(colnames(s1)), multiple = TRUE ),
                                       sliderInput(inputId = "kvalue", 
                                                   label = "How many Clusters", 
                                                   value = 50, min = 0, max = 200),
                                       actionButton(inputId = "plotnetwork", 
                                                    label = "Plot!"),
                                       numericInput("clusternumber", "Which cluster phenotype", value = 1),
+                                      selectInput("mkrs2", "Select which markers to assess", c(colnames(s1)), multiple = TRUE ),
                                       actionButton(inputId = "plotphe", 
                                                    label = "Plot Phenotype")
                                     ),
                                     mainPanel(
                                       headerPanel("SPADE"),
-                                      
                                       p("Simply click on either Tumour or NTB to plot either tissue."),
-                                      
                                       p("Use the slide bar to choose a suitable number of clusters."),
                                       p("Images will be exported to the", strong("images"), "folder of the working directory"),
-                                      
                                       plotOutput("Network"),
                                       plotOutput("Phenotype")
                                     )
@@ -99,24 +97,17 @@ ui <- shinyUI(navbarPage(title = "SPADE",
     includeCSS("cyborg-theme2.css")
   )
 )
-
-
 server <- shinyServer(function(input, output) {
-   
   observeEvent(input$plotnetwork, {
     output$Network <- renderPlot({
       SPADE(s1, input$kvalue, input$mkrs)
         })
   })
-  
   observeEvent(input$plotphe, {
     output$Phenotype <- renderPlot({
-      PHESPADE(s1, input$kvalue, input$clusternumber, input$mkrs)
+      PHESPADE(s1, input$kvalue, input$clusternumber, input$mkrs2)
     })
   })
-  
 })
-
-
 shinyApp(ui = ui, server = server)
 
