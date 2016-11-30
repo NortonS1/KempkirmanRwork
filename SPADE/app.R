@@ -4,13 +4,14 @@ library(circlize)
 library(ComplexHeatmap)
 library(dendextend)
 setwd("~/Desktop/R work/PUT FILES IN HERE")
+My_Palette <- colorRampPalette(c("navy","aliceblue","bisque","chocolate1","firebrick"))(256)
 read.csv("Sample 1.csv") -> s1
 apply(s1,2,mean) -> s1m
 apply(s1,2,sd) -> s1s
 scale(s1,s1m,s1s) -> s1scaled
 as.data.frame(s1scaled) -> s1
 
-SPADE <- function(x,k,mkrs){
+SPADE <- function(x,k,mkrs,expression){
   #initial clustering and binning 
   dist(x[,c(mkrs)], method = "manhattan") -> distx
   hclust(distx) -> clus_x
@@ -56,6 +57,7 @@ SPADE <- function(x,k,mkrs){
   dist(cluster_means, method = "manhattan") -> distx1
   graph.adjacency(as.matrix(distx1),mode="undirected",weighted=TRUE) -> adjgraph
   SPADEgraph <-minimum.spanning.tree(adjgraph)
+  V(SPADEgraph)$expression <- full_data[,c(expression)]
   V(SPADEgraph)$abundance <- full_data[,ncol(full_data)]
   V(SPADEgraph)$size <- (log10(V(SPADEgraph)$abundance))*10 
   mypath2 <- file.path("~/Desktop","R work","PUT FILES IN HERE",
@@ -63,7 +65,10 @@ SPADE <- function(x,k,mkrs){
   png(file = mypath2)
   plot(SPADEgraph, vertex.label.cex = 0.5)
   dev.off()
-  plot(SPADEgraph, vertex.label.cex = 0.5)
+  # colouring(if abundance is greater than 20, returns 1(aka true), 1+1 = 2 so uses second colour, if not then 1+0 so 1 = first colour.)
+  plot(SPADEgraph, vertex.label.cex = 0.5, 
+       vertex.color = c("blue","green", "red")[1+(V(SPADEgraph)$expression>=mean(V(SPADEgraph)$expression))+(V(SPADEgraph)$expression>mean(V(SPADEgraph)$expression))])
+  print(SPADEgraph$expression)
   }
 
 PHESPADE <- function(x,k,clus,mkrs2){
@@ -92,6 +97,7 @@ ui <- shinyUI(navbarPage(title = "SPADE",
                                                   value = 50, min = 0, max = 200),
                                       actionButton(inputId = "plotnetwork", 
                                                    label = "Plot!"),
+                                      selectInput("expression", "Select which marker expression to colour the plot by", c(colnames(s1)), multiple = FALSE ),
                                       numericInput("clusternumber", "Which cluster phenotype", value = 1),
                                       selectInput("mkrs2", "Select which markers to assess", c(colnames(s1)), multiple = TRUE ),
                                       actionButton(inputId = "plotphe", 
@@ -113,7 +119,7 @@ ui <- shinyUI(navbarPage(title = "SPADE",
 server <- shinyServer(function(input, output) {
   observeEvent(input$plotnetwork, {
     output$Network <- renderPlot({
-      SPADE(s1, input$kvalue, input$mkrs)
+      SPADE(s1, input$kvalue, input$mkrs,input$expression)
         })
   })
   observeEvent(input$plotphe, {
