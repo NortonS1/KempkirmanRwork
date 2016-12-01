@@ -13,6 +13,7 @@ as.data.frame(s1scaled) -> s1
 
 SPADE <- function(x,k,mkrs,expression){
   #initial clustering and binning 
+  set.seed(1)
   dist(x[,c(mkrs)], method = "manhattan") -> distx
   hclust(distx) -> clus_x
   cutree(clus_x, k = k) ->cut_x
@@ -66,13 +67,16 @@ SPADE <- function(x,k,mkrs,expression){
   plot(SPADEgraph, vertex.label.cex = 0.5)
   dev.off()
   # colouring(if abundance is greater than 20, returns 1(aka true), 1+1 = 2 so uses second colour, if not then 1+0 so 1 = first colour.)
-  plot(SPADEgraph, vertex.label.cex = 0.5, 
-       vertex.color = c("blue","green", "red")[1+(V(SPADEgraph)$expression>=mean(V(SPADEgraph)$expression))+(V(SPADEgraph)$expression>mean(V(SPADEgraph)$expression))])
+  plot(SPADEgraph, vertex.label.cex = 0.5,vertex.label.color = "black",
+       vertex.color = c("navy","skyblue","chocolate1", "firebrick")[1+(V(SPADEgraph)$expression > (mean(V(SPADEgraph)$expression)) - (sd(V(SPADEgraph)$expression)))+
+                                         (V(SPADEgraph)$expression > mean(V(SPADEgraph)$expression))+
+                                         (V(SPADEgraph)$expression > (mean(V(SPADEgraph)$expression)) + (sd(V(SPADEgraph)$expression)))])
   print(SPADEgraph$expression)
   }
 
 PHESPADE <- function(x,k,clus,mkrs2){
   #initial clustering and binning 
+  set.seed(1)
   dist(x, method = "manhattan") -> distx
   hclust(distx) -> clus_x
   cutree(clus_x, k = k) ->cut_x
@@ -108,6 +112,8 @@ ui <- shinyUI(navbarPage(title = "SPADE",
                                       p("Simply click on either Tumour or NTB to plot either tissue."),
                                       p("Use the slide bar to choose a suitable number of clusters."),
                                       p("Images will be exported to the", strong("images"), "folder of the working directory"),
+                                      textOutput("working"),
+                                      textOutput("done"),
                                       plotOutput("Network"),
                                       plotOutput("Phenotype")
                                     )
@@ -117,10 +123,18 @@ ui <- shinyUI(navbarPage(title = "SPADE",
   )
 )
 server <- shinyServer(function(input, output) {
+  
   observeEvent(input$plotnetwork, {
+    
+    output$working <- renderText({
+      print("Rendering plot...")
+    })
     output$Network <- renderPlot({
       SPADE(s1, input$kvalue, input$mkrs,input$expression)
         })
+    output$done <- renderText({
+      print("Complete!")
+    })
   })
   observeEvent(input$plotphe, {
     output$Phenotype <- renderPlot({
