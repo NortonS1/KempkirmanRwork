@@ -2,30 +2,30 @@
 ################    BEGIN USER SETTINGS    ################
 
 # Turn debug outputs on / off
-debug     <- TRUE
-
-# Use old PUT FILES HERE or work in current directory
-workHere <- TRUE
-
-# Detects OS and sets working directory prefix accordingly. 
-# This could be superseded by a folder selection prompt.
-osxDir     = "~/Desktop/R work"
-winDir     = file.path("C:/Users",Sys.getenv("USERNAME"),"Desktop","R","KempkirmanRwork","SPADE")
-
-# Expected sample file name
-# This could be superseded by a file selection prompt.
-inputFile = "Sample 1.csv"
-
-# Subdirectory for reading input file..
-inputDir   = "PUT FILES IN HERE"
-# ..and writing outputs
-outputDir  = "Images"
-
-# Colour palette for heat-mapping
-My_Palette <- colorRampPalette(c("navy","aliceblue","bisque","chocolate1","firebrick"))(256)
-
-# Select clustering criterion - e.g. manhattan (route distance), euclidean (trigonometric distance)
-clusterMethod = "manhattan"
+# debug     <- TRUE
+# 
+# # Use old PUT FILES HERE or work in current directory
+# workHere <- FALSE
+# 
+# # Detects OS and sets working directory prefix accordingly. 
+# # This could be superseded by a folder selection prompt.
+# osxDir     = "~/Desktop/Lab R work"
+# winDir     = file.path("C:/Users",Sys.getenv("USERNAME"),"Desktop","R","KempkirmanRwork","SPADE")
+# 
+# # Expected sample file name
+# # This could be superseded by a file selection prompt.
+# inputFile = "Sample 1.csv"
+# 
+# # Subdirectory for reading input file..
+# inputDir   = "PUT FILES IN HERE"
+# # ..and writing outputs
+# outputDir  = "Images"
+# 
+# # Colour palette for heat-mapping
+# My_Palette <- colorRampPalette(c("navy","aliceblue","bisque","chocolate1","firebrick"))(256)
+# 
+# # Select clustering criterion - e.g. manhattan (route distance), euclidean (trigonometric distance)
+# clusterMethod = "manhattan"
 
 ################     END USER SETTINGS     ################
 ###########################################################
@@ -36,14 +36,14 @@ library(circlize)
 library(ComplexHeatmap)
 library(dendextend)
 
-# Set the working directory based on OS (Brin's vs. Sam's)
-setwd(switch(Sys.info()['sysname'],'Windows' = winDir, 'Darwin' = osxDir))
-
-# Move to the working directory if not just working in place
-if(!workHere) {
-  setwd("..")
-  setwd(inputDir)
-}
+# # Set the working directory based on OS (Brin's vs. Sam's)
+# setwd(switch(Sys.info()['sysname'],'Windows' = winDir, 'Darwin' = osxDir))
+# 
+# # Move to the working directory if not just working in place
+# if(!workHere) {
+#   setwd("..")
+#   setwd(inputDir)
+# }
 
 My_Palette <- colorRampPalette(c("navy","aliceblue","bisque","chocolate1","firebrick"))(256)
 read.csv("Sample 1.csv") -> s1
@@ -52,10 +52,10 @@ apply(s1,2,sd) -> s1s
 scale(s1,s1m,s1s) -> s1scaled
 as.data.frame(s1scaled) -> s1
 
-# Output debugging info with status code if given (0 = unspecified / nominal)
-debug <- function(dmessage,dstatus = 0){
-  print(paste0(Sys.time()," Debug: ",dmessage," status = ",dstatus))
-}
+# # Output debugging info with status code if given (0 = unspecified / nominal)
+# debug <- function(dmessage,dstatus = 0){
+#   print(paste0(Sys.time()," Debug: ",dmessage," status = ",dstatus))
+# }
 
 SPADE <- function(x,k,mkrs,expression){
   #initial clustering and binning 
@@ -85,24 +85,24 @@ SPADE <- function(x,k,mkrs,expression){
   as.data.frame(abd_data, row.names = c(clus_names)) -> cluster_abundance
   cluster_abundance[,1] -> cluster_abundance
   
-  # Switch to the image output directory (fixes png() on Windows)
-  setwd(outputDir)
+  # # Switch to the image output directory (fixes png() on Windows)
+  # setwd(outputDir)
   
   full_data = data.frame(cluster_means, cluster_abundance)
   # Heatmapping clusters for easy viewing
-  png(file = paste0("Heatmap_","cluster_",i, ".png"))
+  png(file = paste("Heatmap_","cluster_",i, ".png"))
   heatmap(as.matrix(cluster_means), Colv = NA, col = My_Palette)
   dev.off()
-  debug("[SPADE] Wrote heatmap ")
+  # debug("[SPADE] Wrote heatmap ")
   
   # Saving phenotypes as box and whisker graphs
   for(i in 1:k){
-    png(file = paste0("phenotype_","cluster_", i, ".png"), width = 1700, units = "px")
+    png(file = paste("phenotype_","cluster_", i, ".png"), width = 1700, units = "px")
     phedat = data.frame(x[c(cut_x == i),])
     boxplot.matrix(as.matrix(phedat), cex = 0.5, pch = 20, las = 2, main = paste0("cluster",i))
     dev.off()
   }
-  debug("[SPADE] Finished writing phenotype plots",k)
+  # debug("[SPADE] Finished writing phenotype plots",k)
   
   #calculating cluster distances and plotting
   dist(cluster_means, method = "manhattan") -> distx1
@@ -111,13 +111,13 @@ SPADE <- function(x,k,mkrs,expression){
   V(SPADEgraph)$expression <- full_data[,c(expression)]
   V(SPADEgraph)$abundance <- full_data[,ncol(full_data)]
   V(SPADEgraph)$size <- (log10(V(SPADEgraph)$abundance))*10 
-  png(file = paste0("Network_",expression,".png"))
+  png(file = paste("Network_",expression,".png"))
   plot(SPADEgraph, vertex.label.cex = 0.5,vertex.label.color = "black",
        vertex.color = c("navy","skyblue","chocolate1", "firebrick")[1+(V(SPADEgraph)$expression > (mean(V(SPADEgraph)$expression)) - (sd(V(SPADEgraph)$expression)))+
                                                                       (V(SPADEgraph)$expression > mean(V(SPADEgraph)$expression))+
                                                                       (V(SPADEgraph)$expression > (mean(V(SPADEgraph)$expression)) + (sd(V(SPADEgraph)$expression)))])
   dev.off()
-  debug("[SPADE] Wrote network plot")
+  # debug("[SPADE] Wrote network plot")
   
   # colouring(if abundance is greater than 20, returns 1(aka true), 1+1 = 2 so uses second colour, if not then 1+0 so 1 = first colour.)
   plot(SPADEgraph, vertex.label.cex = 0.5,vertex.label.color = "black",
@@ -125,7 +125,7 @@ SPADE <- function(x,k,mkrs,expression){
                                          (V(SPADEgraph)$expression > mean(V(SPADEgraph)$expression))+
                                          (V(SPADEgraph)$expression > (mean(V(SPADEgraph)$expression)) + (sd(V(SPADEgraph)$expression)))])
   print(SPADEgraph$expression)
-  setwd("..")
+  # setwd("..")
   }
 
 PHESPADE <- function(x,k,clus,mkrs2){
