@@ -19,7 +19,7 @@
 # # Subdirectory for reading input file..
 # inputDir   = "PUT FILES IN HERE"
 # # ..and writing outputs
-# outputDir  = "Images"
+outputDir  = "Images"
 # 
 # # Colour palette for heat-mapping
 # My_Palette <- colorRampPalette(c("navy","aliceblue","bisque","chocolate1","firebrick"))(256)
@@ -86,7 +86,7 @@ SPADE <- function(x,k,mkrs,expression){
   cluster_abundance[,1] -> cluster_abundance
   
   # # Switch to the image output directory (fixes png() on Windows)
-  # setwd(outputDir)
+  setwd(outputDir)
   
   full_data = data.frame(cluster_means, cluster_abundance)
   # Heatmapping clusters for easy viewing
