@@ -46,7 +46,7 @@ library(dendextend)
 # }
 
 My_Palette <- colorRampPalette(c("navy","aliceblue","bisque","chocolate1","firebrick"))(256)
-read.csv("Sample 1.csv") -> s1
+read.csv("Sample 1-Sam.csv") -> s1
 apply(s1,2,mean) -> s1m
 apply(s1,2,sd) -> s1s
 scale(s1,s1m,s1s) -> s1scaled
@@ -60,6 +60,7 @@ as.data.frame(s1scaled) -> s1
 SPADE <- function(x,k,mkrs,expression){
   #initial clustering and binning 
   set.seed(1)
+  # could use layout = 1 in the final plot function to fix this instead
   dist(x[,c(mkrs)], method = "manhattan") -> distx
   hclust(distx) -> clus_x
   cutree(clus_x, k = k) ->cut_x
@@ -108,24 +109,28 @@ SPADE <- function(x,k,mkrs,expression){
   dist(cluster_means, method = "manhattan") -> distx1
   graph.adjacency(as.matrix(distx1),mode="undirected",weighted=TRUE) -> adjgraph
   SPADEgraph <- minimum.spanning.tree(adjgraph)
-  V(SPADEgraph)$expression <- full_data[,c(expression)]
+  # V(SPADEgraph)$expression <- full_data[,c(expression)]
   V(SPADEgraph)$abundance <- full_data[,ncol(full_data)]
-  V(SPADEgraph)$size <- (log10(V(SPADEgraph)$abundance))*10 
-  png(file = paste("Network_",expression,".png"))
-  plot(SPADEgraph, vertex.label.cex = 0.5,vertex.label.color = "black",
-       vertex.color = c("navy","skyblue","chocolate1", "firebrick")[1+(V(SPADEgraph)$expression > (mean(V(SPADEgraph)$expression)) - (sd(V(SPADEgraph)$expression)))+
-                                                                      (V(SPADEgraph)$expression > mean(V(SPADEgraph)$expression))+
-                                                                      (V(SPADEgraph)$expression > (mean(V(SPADEgraph)$expression)) + (sd(V(SPADEgraph)$expression)))])
-  dev.off()
+  V(SPADEgraph)$size <- (log10(V(SPADEgraph)$abundance))*10  
+  ceb <<- cluster_edge_betweenness(SPADEgraph)
+  SPADEdata <<- SPADEgraph
+  all_data <<- full_data
+  # assign(SPADEgraph, envir = .GlobalEnv)
+  # png(file = paste("Network_",expression,".png"))
+  # plot(SPADEgraph, vertex.label.cex = 0.5,vertex.label.color = "black",
+  #      vertex.color = c("white","lightskyblue1","dodgerblue1", "royalblue3")[1+(V(SPADEgraph)$expression > (mean(V(SPADEgraph)$expression)) - (sd(V(SPADEgraph)$expression)))+
+  #                                                                     (V(SPADEgraph)$expression > mean(V(SPADEgraph)$expression))+
+  #                                                                     (V(SPADEgraph)$expression > (mean(V(SPADEgraph)$expression)) + (sd(V(SPADEgraph)$expression)))])
+  # dev.off()
   # debug("[SPADE] Wrote network plot")
   
   # colouring(if abundance is greater than 20, returns 1(aka true), 1+1 = 2 so uses second colour, if not then 1+0 so 1 = first colour.)
-  plot(SPADEgraph, vertex.label.cex = 0.5,vertex.label.color = "black",
-       vertex.color = c("navy","skyblue","chocolate1", "firebrick")[1+(V(SPADEgraph)$expression > (mean(V(SPADEgraph)$expression)) - (sd(V(SPADEgraph)$expression)))+
-                                         (V(SPADEgraph)$expression > mean(V(SPADEgraph)$expression))+
-                                         (V(SPADEgraph)$expression > (mean(V(SPADEgraph)$expression)) + (sd(V(SPADEgraph)$expression)))])
-  print(SPADEgraph$expression)
-  # setwd("..")
+  
+  
+  # plot(ceb, SPADEgraph)
+  # print(membership(ceb))
+  setwd("..")
+  
   }
 
 PHESPADE <- function(x,k,clus,mkrs2){
@@ -153,8 +158,12 @@ ui <- shinyUI(navbarPage(title = "SPADE",
                                       sliderInput(inputId = "kvalue", 
                                                   label = "How many Clusters", 
                                                   value = 50, min = 0, max = 200),
+                                      actionButton(inputId = "docluster", 
+                                                   label = "Cluster"),
                                       actionButton(inputId = "plotnetwork", 
                                                    label = "Plot!"),
+                                      actionButton(inputId = "plotnetworkcoloured", 
+                                                   label = "Plot by marker"),
                                       selectInput("expression", "Select which marker expression to colour the plot by", c(colnames(s1)), multiple = FALSE ),
                                       numericInput("clusternumber", "Which cluster phenotype", value = 1),
                                       selectInput("mkrs2", "Select which markers to assess", c(colnames(s1)), multiple = TRUE ),
@@ -163,12 +172,14 @@ ui <- shinyUI(navbarPage(title = "SPADE",
                                     ),
                                     mainPanel(
                                       headerPanel("SPADE"),
-                                      p("Simply click on either Tumour or NTB to plot either tissue."),
-                                      p("Use the slide bar to choose a suitable number of clusters."),
-                                      p("Images will be exported to the", strong("images"), "folder of the working directory"),
+                                      p(strong("Simply click on either Tumour or NTB to plot either tissue.")),
+                                      p(strong("Use the slide bar to choose a suitable number of clusters.")),
+                                      p(strong("Images will be exported to the", strong("images"), "folder of the working directory")),
                                       textOutput("working"),
                                       textOutput("done"),
+                                      textOutput("clusterdone"),
                                       plotOutput("Network"),
+                                      plotOutput("Networkcoloured"),
                                       plotOutput("Phenotype")
                                     )
                                   )
@@ -178,14 +189,39 @@ ui <- shinyUI(navbarPage(title = "SPADE",
 )
 server <- shinyServer(function(input, output) {
   
+  observeEvent(input$docluster,{
+    
+    SPADE(s1, input$kvalue, input$mkrs)
+    output$clusterdone <- renderText({
+      print("Clustering Complete")
+    })
+  })
   observeEvent(input$plotnetwork, {
     
     output$working <- renderText({
       print("Rendering plot...")
     })
     output$Network <- renderPlot({
-      SPADE(s1, input$kvalue, input$mkrs,input$expression)
-        })
+      set.seed(1)
+      plot(ceb, SPADEdata) 
+      })
+    output$done <- renderText({
+      print("Complete!")
+    })
+  })
+  observeEvent(input$plotnetworkcoloured, {
+    
+    output$working <- renderText({
+      print("Rendering plot...")
+    })
+    output$Networkcoloured <- renderPlot({
+      set.seed(1)
+      V(SPADEdata)$expression <- all_data[,c(input$expression)]
+      plot(SPADEdata, vertex.label.cex = 0.5,vertex.label.color = "black",
+           vertex.color = c("white","lightskyblue1","dodgerblue1", "royalblue3")[1+(V(SPADEdata)$expression > (mean(V(SPADEdata)$expression)) - (sd(V(SPADEdata)$expression)))+
+                                                                                   (V(SPADEdata)$expression > mean(V(SPADEdata)$expression))+
+                                                                                   (V(SPADEdata)$expression > (mean(V(SPADEdata)$expression)) + (sd(V(SPADEdata)$expression)))] )
+      })
     output$done <- renderText({
       print("Complete!")
     })
