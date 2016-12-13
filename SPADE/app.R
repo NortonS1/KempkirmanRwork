@@ -111,7 +111,14 @@ SPADE <- function(x,k,mkrs,expression){
   SPADEgraph <- minimum.spanning.tree(adjgraph)
   # V(SPADEgraph)$expression <- full_data[,c(expression)]
   V(SPADEgraph)$abundance <- full_data[,ncol(full_data)]
-  V(SPADEgraph)$size <- (log10(V(SPADEgraph)$abundance))*10  
+  V(SPADEgraph)$size <- (log10(V(SPADEgraph)$abundance))*10
+  
+  V(adjgraph)$abundance <- full_data[,ncol(full_data)]
+  V(adjgraph)$size <- log10(V(adjgraph)$abundance)*10
+  cut.off <- mean(E(adjgraph)$weight)+sd(E(adjgraph)$weight)
+  
+  adjgraph.sp <<- delete_edges(adjgraph,E(adjgraph)[E(adjgraph)$weight < cut.off])
+  forcedirected<<-layout.forceatlas2(adjgraph.sp, iterations = 100, linlog = TRUE, k = 100, gravity = 1, ks = 100 )
   ceb <<- cluster_edge_betweenness(SPADEgraph)
   SPADEdata <<- SPADEgraph
   all_data <<- full_data
@@ -130,7 +137,7 @@ SPADE <- function(x,k,mkrs,expression){
   # plot(ceb, SPADEgraph)
   # print(membership(ceb))
   setwd("..")
-  
+  return(length(ceb))
   }
 
 PHESPADE <- function(x,k,clus,mkrs2){
@@ -160,10 +167,16 @@ ui <- shinyUI(navbarPage(title = "SPADE",
                                                   value = 50, min = 0, max = 200),
                                       actionButton(inputId = "docluster", 
                                                    label = "Cluster"),
+                                      p(""),
                                       actionButton(inputId = "plotnetwork", 
-                                                   label = "Plot!"),
+                                                   label = "Plot MST!"),
+                                      p(""),
                                       actionButton(inputId = "plotnetworkcoloured", 
                                                    label = "Plot by marker"),
+                                      p(""),
+                                      actionButton(inputId = "plotnetworkforce", 
+                                                   label = "Plot force directed"),
+                                      p(""),
                                       selectInput("expression", "Select which marker expression to colour the plot by", c(colnames(s1)), multiple = FALSE ),
                                       numericInput("clusternumber", "Which cluster phenotype", value = 1),
                                       selectInput("mkrs2", "Select which markers to assess", c(colnames(s1)), multiple = TRUE ),
@@ -179,7 +192,11 @@ ui <- shinyUI(navbarPage(title = "SPADE",
                                       textOutput("done"),
                                       textOutput("clusterdone"),
                                       plotOutput("Network"),
+                                      p(""),
                                       plotOutput("Networkcoloured"),
+                                      p(""),
+                                      plotOutput("Networkforce"),
+                                      p(""),
                                       plotOutput("Phenotype")
                                     )
                                   )
@@ -226,6 +243,25 @@ server <- shinyServer(function(input, output) {
       print("Complete!")
     })
   })
+  
+  observeEvent(input$plotnetworkforce, {
+    
+    output$working <- renderText({
+      print("Rendering plot...")
+    })
+    output$Networkforce <- renderPlot({
+      set.seed(1)
+      V(SPADEdata)$expression <- all_data[,c(input$expression)]
+      plot(adjgraph.sp, layout = forcedirected, 
+           vertex.color = c("white","lightskyblue1","dodgerblue1", "royalblue3")[1+(V(SPADEdata)$expression > (mean(V(SPADEdata)$expression)) - (sd(V(SPADEdata)$expression)))+
+                                                                                                                        (V(SPADEdata)$expression > mean(V(SPADEdata)$expression))+
+                                                                                                                        (V(SPADEdata)$expression > (mean(V(SPADEdata)$expression)) + (sd(V(SPADEdata)$expression)))]) 
+    })
+    output$done <- renderText({
+      print("Complete!")
+    })
+  })
+  
   observeEvent(input$plotphe, {
     output$Phenotype <- renderPlot({
       PHESPADE(s1, input$kvalue, input$clusternumber, input$mkrs2)

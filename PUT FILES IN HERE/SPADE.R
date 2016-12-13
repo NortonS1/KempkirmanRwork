@@ -1,6 +1,6 @@
 #SPADE!!!
 
-read.csv("Sample 1.csv") -> x
+read.csv("Sample 1-Sam.csv") -> x
 apply(x,2,mean) -> xm
 apply(x,2,sd) -> xs
 scale(x,xm,xs) -> xscaled
@@ -38,7 +38,7 @@ as.data.frame(abd_data, row.names = c(clus_names)) -> cluster_abundance
 cluster_abundance[,1] -> cluster_abundance
 
 full_data = data.frame(cluster_means, cluster_abundance)
-View(full_data[,-ncol(full_data)])
+# View(full_data[,-ncol(full_data)])
 # Heatmapping clusters for easy viewing
 mypath4 <- file.path("~/Desktop","Lab R work","PUT FILES IN HERE",
                      "Images",paste("Heatmap_","cluster_", ".png", sep = ""))
@@ -57,13 +57,19 @@ for(i in 1:k){
 #calculating cluster distances and plotting
 
 dist(full_data[,-ncol(full_data)], method = "manhattan") -> distx1
-graph.adjacency(as.matrix(distx1),mode="undirected",weighted=TRUE) -> adjgraph
-SPADEgraph <-minimum.spanning.tree(adjgraph)
-  V(SPADEgraph)$abundance <- full_data[,ncol(full_data)]
-V(SPADEgraph)$size <- V(SPADEgraph)$abundance*0.7 
+adjgraph <- graph.adjacency(as.matrix(distx1),mode="upper",weighted=TRUE)
+SPADEgraph <<-minimum.spanning.tree(adjgraph)
+  V(adjgraph)$abundance <- full_data[,ncol(full_data)]
+V(adjgraph)$size <- log10(V(adjgraph)$abundance)*10
+# E(adjgraph)$edge.width <- (E(adjgraph)$weight)
 mypath2 <- file.path("~/Desktop","Lab R work","PUT FILES IN HERE",
                      "Images",paste("Network_", ".png", sep = ""))
+cut.off <- mean(E(adjgraph)$weight)+sd(E(adjgraph)$weight)
+adjgraph.sp <- delete_edges(adjgraph,E(adjgraph)[E(adjgraph)$weight < cut.off])
+print(adjgraph.sp)
+print(E(adjgraph)$weight)
 png(file = mypath2)
-plot(SPADEgraph)
+layout.forceatlas2(adjgraph.sp, iterations = 100, linlog = TRUE, k = 100, gravity = 1, ks = 100 ) -> forcedirected
+plot(adjgraph.sp, layout = forcedirected)
 dev.off()}
 
