@@ -35,6 +35,7 @@ library(igraph)
 library(circlize)
 library(ComplexHeatmap)
 library(dendextend)
+library(ForceAtlas2)
 
 # # Set the working directory based on OS (Brin's vs. Sam's)
 # setwd(switch(Sys.info()['sysname'],'Windows' = winDir, 'Darwin' = osxDir))
@@ -46,7 +47,7 @@ library(dendextend)
 # }
 
 My_Palette <- colorRampPalette(c("navy","aliceblue","bisque","chocolate1","firebrick"))(256)
-read.csv("Sample 1-Sam.csv") -> s1
+read.csv("Sample 2.csv") -> s1
 apply(s1,2,mean) -> s1m
 apply(s1,2,sd) -> s1s
 scale(s1,s1m,s1s) -> s1scaled
@@ -57,7 +58,7 @@ as.data.frame(s1scaled) -> s1
 #   print(paste0(Sys.time()," Debug: ",dmessage," status = ",dstatus))
 # }
 
-SPADE <- function(x,k,mkrs,expression){
+SPADE <- function(x,k,mkrs,expression, gravity, repel){
   #initial clustering and binning 
   set.seed(1)
   # could use layout = 1 in the final plot function to fix this instead
@@ -118,8 +119,12 @@ SPADE <- function(x,k,mkrs,expression){
   cut.off <- mean(E(adjgraph)$weight)+sd(E(adjgraph)$weight)
   
   adjgraph.sp <<- delete_edges(adjgraph,E(adjgraph)[E(adjgraph)$weight < cut.off])
-  forcedirected<<-layout.forceatlas2(adjgraph.sp, iterations = 100, linlog = TRUE, k = 100, gravity = 1, ks = 100 )
+  # forcedirected<<-layout.forceatlas2(adjgraph.sp, directed = FALSE, iterations = 1000,
+  #                                    linlog = FALSE, pos = NULL, nohubs = TRUE, k = 5, gravity = 5,
+  #                                    ks = 0.2, ksmax = 20, delta = 1, center = NULL,
+  #                                    plotlabels = TRUE )
   ceb <<- cluster_edge_betweenness(SPADEgraph)
+  cebforce <<- cluster_edge_betweenness(adjgraph.sp)
   SPADEdata <<- SPADEgraph
   all_data <<- full_data
   # assign(SPADEgraph, envir = .GlobalEnv)
@@ -176,6 +181,13 @@ ui <- shinyUI(navbarPage(title = "SPADE",
                                       p(""),
                                       actionButton(inputId = "plotnetworkforce", 
                                                    label = "Plot force directed"),
+                                      numericInput("gravity", "gravity", value = 0),
+                                      numericInput("repel", "repel", value = 100),
+                                      numericInput("ks", "ks", value = 50),
+                                      numericInput("ksmax", "ksmax", value = 100),
+                                      checkboxInput("linlog", "linlog", value = TRUE),
+                                      checkboxInput("hubs", "hubs", value = FALSE),
+                                    
                                       p(""),
                                       selectInput("expression", "Select which marker expression to colour the plot by", c(colnames(s1)), multiple = FALSE ),
                                       numericInput("clusternumber", "Which cluster phenotype", value = 1),
@@ -208,7 +220,7 @@ server <- shinyServer(function(input, output) {
   
   observeEvent(input$docluster,{
     
-    SPADE(s1, input$kvalue, input$mkrs)
+    SPADE(s1, input$kvalue, input$mkrs,expression = NULL,input$gravity, input$repel)
     output$clusterdone <- renderText({
       print("Clustering Complete")
     })
@@ -235,7 +247,7 @@ server <- shinyServer(function(input, output) {
       set.seed(1)
       V(SPADEdata)$expression <- all_data[,c(input$expression)]
       plot(SPADEdata, vertex.label.cex = 0.5,vertex.label.color = "black",
-           vertex.color = c("white","lightskyblue1","dodgerblue1", "royalblue3")[1+(V(SPADEdata)$expression > (mean(V(SPADEdata)$expression)) - (sd(V(SPADEdata)$expression)))+
+           vertex.color = c("royalblue3", "dodgerblue1", "darkorchid1", "chocolate1", "brown1")[1+(V(SPADEdata)$expression > (mean(V(SPADEdata)$expression)) - (sd(V(SPADEdata)$expression)))+
                                                                                    (V(SPADEdata)$expression > mean(V(SPADEdata)$expression))+
                                                                                    (V(SPADEdata)$expression > (mean(V(SPADEdata)$expression)) + (sd(V(SPADEdata)$expression)))] )
       })
@@ -251,12 +263,30 @@ server <- shinyServer(function(input, output) {
     })
     output$Networkforce <- renderPlot({
       set.seed(1)
-      V(SPADEdata)$expression <- all_data[,c(input$expression)]
-      plot(adjgraph.sp, layout = forcedirected, 
-           vertex.color = c("white","lightskyblue1","dodgerblue1", "royalblue3")[1+(V(SPADEdata)$expression > (mean(V(SPADEdata)$expression)) - (sd(V(SPADEdata)$expression)))+
-                                                                                                                        (V(SPADEdata)$expression > mean(V(SPADEdata)$expression))+
-                                                                                                                        (V(SPADEdata)$expression > (mean(V(SPADEdata)$expression)) + (sd(V(SPADEdata)$expression)))]) 
-    })
+      
+      forcedirected<<-layout.forceatlas2(adjgraph.sp, directed = FALSE, iterations = 1000,
+                                         linlog = input$linlog, pos = NULL, nohubs = input$hubs, k = input$repel, gravity = input$gravity,
+                                         ks = input$ks, ksmax = input$ksmax, delta = 1, center = NULL,
+                                         plotlabels = TRUE )                                                                                                             
+      
+      V(adjgraph.sp)$expression <- all_data[,c(input$expression)]
+      plot(adjgraph.sp, layout = forcedirected, vertex.label.cex = 0.5,vertex.label.color = "black",
+           vertex.color = c("navy", "royalblue3", "lightskyblue", "lightsteelblue", "aliceblue","gray95",
+                            "mistyrose", "lightpink", "lightcoral", "indianred", "red")
+                          [1+
+                            (V(adjgraph.sp)$expression >-0.8)+ 
+                            (V(adjgraph.sp)$expression >-0.6)+
+                            (V(adjgraph.sp)$expression >-0.4)+
+                            (V(adjgraph.sp)$expression >-0.2)+
+                            (V(adjgraph.sp)$expression >0)+
+                            (V(adjgraph.sp)$expression >0.2)+
+                            (V(adjgraph.sp)$expression >0.4)+
+                            (V(adjgraph.sp)$expression >0.75)+
+                            (V(adjgraph.sp)$expression >1)+
+                            (V(adjgraph.sp)$expression >2.5)
+                          ])
+     
+      })
     output$done <- renderText({
       print("Complete!")
     })
