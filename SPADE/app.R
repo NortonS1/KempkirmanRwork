@@ -1,3 +1,5 @@
+
+
 ###########################################################
 ################    BEGIN USER SETTINGS    ################
 
@@ -36,6 +38,7 @@ library(circlize)
 library(ComplexHeatmap)
 library(dendextend)
 library(ForceAtlas2)
+library(cluster)
 
 # # Set the working directory based on OS (Brin's vs. Sam's)
 # setwd(switch(Sys.info()['sysname'],'Windows' = winDir, 'Darwin' = osxDir))
@@ -46,8 +49,12 @@ library(ForceAtlas2)
 #   setwd(inputDir)
 # }
 
+# assigning palette
 My_Palette <- colorRampPalette(c("navy","aliceblue","bisque","chocolate1","firebrick"))(256)
-read.csv("Sample 2.csv") -> s1
+
+#Reading in data and scaling
+
+read.csv("Test cytof data.csv") -> s1
 apply(s1,2,mean) -> s1m
 apply(s1,2,sd) -> s1s
 scale(s1,s1m,s1s) -> s1scaled
@@ -58,21 +65,45 @@ as.data.frame(s1scaled) -> s1
 #   print(paste0(Sys.time()," Debug: ",dmessage," status = ",dstatus))
 # }
 
-SPADE <- function(x,k,mkrs,expression, gravity, repel){
-  #initial clustering and binning 
+#Clustering function
+
+Cluster <- function(x,k,mkrs,expression, gravity, repel){
+  
+  #  /////////////////////////////////////////////////////////////////NORMAL
   set.seed(1)
+  #initial clustering and binning 
+  
   # could use layout = 1 in the final plot function to fix this instead
-  dist(x[,c(mkrs)], method = "manhattan") -> distx
-  hclust(distx) -> clus_x
-  cutree(clus_x, k = k) ->cut_x
+  # dist(x[,c(mkrs)], method = "manhattan") -> distx
+  # hclust(distx) -> clus_x
+  # cutree(clus_x, k = k) ->cut_x
+  # datalist = list()
+  # abundancedatalist = list()
+  # for(i in 1:k){
+  #   dat = data.frame(colMeans(x[c(cut_x == i),mkrs]))
+  #   datalist[[i]] <- dat
+  #   abundancedat = data.frame(dim(x[c(cut_x == i),]))
+  #   abundancedatalist[[i]] <- abundancedat
+  #      }
+  
+  #  /////////////////////////////////////////////////////////////////NORMAL
+  
+  
+# /////////////////////////////////////////////////////////////////CLARA
+  clara_clustered <- clara(x[,c(mkrs)], k, metric = "manhattan", stand = TRUE,
+                           samples = 1000, sampsize = (nrow(x)), rngR = FALSE)
   datalist = list()
   abundancedatalist = list()
+
   for(i in 1:k){
-    dat = data.frame(colMeans(x[c(cut_x == i),mkrs]))
+    dat = data.frame(colMeans(x[c(clara_clustered$clustering == i),mkrs]))
     datalist[[i]] <- dat
-    abundancedat = data.frame(dim(x[c(cut_x == i),]))
+    abundancedat = data.frame(clara_clustered$clusinfo[i,])
     abundancedatalist[[i]] <- abundancedat
-  }
+      }
+  
+  # ////////////////////////////////////////////////////////////////CLARA
+  
   #cleaning data and assigning to data frame
   big_data = do.call(cbind, datalist)
   big_data = t(big_data)
@@ -86,47 +117,64 @@ SPADE <- function(x,k,mkrs,expression, gravity, repel){
   clus_names <- as.character(clus_num)
   as.data.frame(abd_data, row.names = c(clus_names)) -> cluster_abundance
   cluster_abundance[,1] -> cluster_abundance
+  full_data = data.frame(cluster_means, cluster_abundance)
   
   # # Switch to the image output directory (fixes png() on Windows)
   setwd(outputDir)
   
-  full_data = data.frame(cluster_means, cluster_abundance)
   # Heatmapping clusters for easy viewing
   png(file = paste("Heatmap_","cluster_",i, ".png"))
   heatmap(as.matrix(cluster_means), Colv = NA, col = My_Palette)
   dev.off()
   # debug("[SPADE] Wrote heatmap ")
   
+  
   # Saving phenotypes as box and whisker graphs
   for(i in 1:k){
     png(file = paste("phenotype_","cluster_", i, ".png"), width = 1700, units = "px")
-    phedat = data.frame(x[c(cut_x == i),])
+    phedat = data.frame(x[c(clara_clustered$clustering == i),])
     boxplot.matrix(as.matrix(phedat), cex = 0.5, pch = 20, las = 2, main = paste0("cluster",i))
     dev.off()
   }
+  
   # debug("[SPADE] Finished writing phenotype plots",k)
   
-  #calculating cluster distances and plotting
+  #calculating cluster distances and assigning attributes
+  
   dist(cluster_means, method = "manhattan") -> distx1
   graph.adjacency(as.matrix(distx1),mode="undirected",weighted=TRUE) -> adjgraph
   SPADEgraph <- minimum.spanning.tree(adjgraph)
+  
   # V(SPADEgraph)$expression <- full_data[,c(expression)]
   V(SPADEgraph)$abundance <- full_data[,ncol(full_data)]
   V(SPADEgraph)$size <- (log10(V(SPADEgraph)$abundance))*10
   
   V(adjgraph)$abundance <- full_data[,ncol(full_data)]
   V(adjgraph)$size <- log10(V(adjgraph)$abundance)*10
-  cut.off <- mean(E(adjgraph)$weight)+sd(E(adjgraph)$weight)
   
-  adjgraph.sp <<- delete_edges(adjgraph,E(adjgraph)[E(adjgraph)$weight < cut.off])
+  #setting edge cuttoffs and min vertex sizes
+  
+  cut.off <- mean(E(adjgraph)$weight)+(sd(E(adjgraph)$weight)) # this will have to change to only attach to landmarks
+  
+  adjgraph.sp <- delete_edges(adjgraph,E(adjgraph)[E(adjgraph)$weight < cut.off])
+  adjgraph.sp <<- delete_vertices(adjgraph.sp, V(adjgraph.sp)[V(adjgraph.sp)$size < 1])
+  
   # forcedirected<<-layout.forceatlas2(adjgraph.sp, directed = FALSE, iterations = 1000,
   #                                    linlog = FALSE, pos = NULL, nohubs = TRUE, k = 5, gravity = 5,
   #                                    ks = 0.2, ksmax = 20, delta = 1, center = NULL,
   #                                    plotlabels = TRUE )
+  
+  #Returning all Values to plot reactively
+  forcedirected<<-layout.forceatlas2(adjgraph.sp, directed = FALSE, iterations = 1000,
+                                     linlog = input$linlog, pos = NULL, nohubs = input$hubs, k = input$repel, gravity = input$gravity,
+                                     ks = input$ks, ksmax = input$ksmax, delta = 1, center = NULL,
+                                     plotlabels = TRUE )    
+  
   ceb <<- cluster_edge_betweenness(SPADEgraph)
   cebforce <<- cluster_edge_betweenness(adjgraph.sp)
   SPADEdata <<- SPADEgraph
   all_data <<- full_data
+  
   # assign(SPADEgraph, envir = .GlobalEnv)
   # png(file = paste("Network_",expression,".png"))
   # plot(SPADEgraph, vertex.label.cex = 0.5,vertex.label.color = "black",
@@ -143,7 +191,9 @@ SPADE <- function(x,k,mkrs,expression, gravity, repel){
   # print(membership(ceb))
   setwd("..")
   return(length(ceb))
-  }
+}
+
+#Cluster data for phenotype plotting
 
 PHESPADE <- function(x,k,clus,mkrs2){
   #initial clustering and binning 
@@ -155,27 +205,27 @@ PHESPADE <- function(x,k,clus,mkrs2){
   phedat = data.frame(x[c(cut_x == clus),])
    boxplot.matrix(as.matrix(phedat[,c(mkrs2)]), cex = 0.5, pch = 20, las = 2,
                    main = paste("cluster",clus, sep = " "))
+    }
   
-  }
-  
+#Begin UI//////////////////////////////////////////////////////////////////////////////////////////////////////
 
-My_Palette <- colorRampPalette(c("navy","aliceblue","bisque","chocolate1","firebrick"))(256)
-
-
-ui <- shinyUI(navbarPage(title = "SPADE",
-                         tabPanel(title = "SPADE",
+ui <- shinyUI(navbarPage(title = "Cluster App",
+                         tabPanel(title = "Cluster App",
                                   sidebarLayout(
                                     sidebarPanel(
                                       selectInput("mkrs", "Select which markers to cluster", c(colnames(s1)), multiple = TRUE ),
                                       sliderInput(inputId = "kvalue", 
                                                   label = "How many Clusters", 
                                                   value = 50, min = 0, max = 200),
+                                      # checkboxInput("clara", "clara", value = TRUE),
                                       actionButton(inputId = "docluster", 
                                                    label = "Cluster"),
                                       p(""),
                                       actionButton(inputId = "plotnetwork", 
                                                    label = "Plot MST!"),
-                                      p(""),
+                                      actionButton(inputId = "print_MST_ceb", 
+                                                   label = "print"),
+                                      p(""), 
                                       actionButton(inputId = "plotnetworkcoloured", 
                                                    label = "Plot by marker"),
                                       p(""),
@@ -194,11 +244,14 @@ ui <- shinyUI(navbarPage(title = "SPADE",
                                       selectInput("mkrs2", "Select which markers to assess", c(colnames(s1)), multiple = TRUE ),
                                       actionButton(inputId = "plotphe", 
                                                    label = "Plot Phenotype")
-                                    ),
+                                            ),
                                     mainPanel(
-                                      headerPanel("SPADE"),
-                                      p(strong("Simply click on either Tumour or NTB to plot either tissue.")),
-                                      p(strong("Use the slide bar to choose a suitable number of clusters.")),
+                                      headerPanel("Cluster App"),
+                                      p(strong("Simply choose the markers you wish to use for clustering from the drop down menu.")),
+                                      p(strong("Then use the slide bar to choose a suitable number of clusters.")),
+                                      p(strong("Once you're happy with the settings press cluster and you're away!")),
+                                      p("Depending on your data size, this may take a minute..."),
+                                      p(strong("When it pops up saying clustering is complete, simply click the graphing buttons and your plot will appear")),
                                       p(strong("Images will be exported to the", strong("images"), "folder of the working directory")),
                                       textOutput("working"),
                                       textOutput("done"),
@@ -213,18 +266,31 @@ ui <- shinyUI(navbarPage(title = "SPADE",
                                     )
                                   )
     ),
+
+    #CSS Themeing
     includeCSS("cyborg-theme2.css")
   )
 )
+
+#END UI ///////////////////////////////////////////////////////////////////////////////////////////////
+
+#BEGIN SERVER /////////////////////////////////////////////////////////////////////////////////////////
+
 server <- shinyServer(function(input, output) {
   
+  
+  #Do Clustering
+  
   observeEvent(input$docluster,{
-    
-    SPADE(s1, input$kvalue, input$mkrs,expression = NULL,input$gravity, input$repel)
-    output$clusterdone <- renderText({
+      print("Clustering...")
+      Cluster(s1, input$kvalue, input$mkrs,expression = NULL,input$gravity, input$repel)
+      output$clusterdone <- renderText({
       print("Clustering Complete")
     })
   })
+   
+  #Plot SPADE with ceb colouring 
+  
   observeEvent(input$plotnetwork, {
     
     output$working <- renderText({
@@ -232,12 +298,26 @@ server <- shinyServer(function(input, output) {
     })
     output$Network <- renderPlot({
       set.seed(1)
-      plot(ceb, SPADEdata) 
+      plot(ceb, SPADEdata)
       })
     output$done <- renderText({
       print("Complete!")
     })
   })
+  observeEvent(input$print_MST_ceb, {
+    setwd(outputDir)
+    
+      set.seed(1)
+      png(file = paste("Ceb_","MST", ".png"))
+      plot(ceb, SPADEdata)
+      dev.off()
+
+    setwd("..")
+    
+  })
+  
+  #plot SPADE with user input expression colouring
+  
   observeEvent(input$plotnetworkcoloured, {
     
     output$working <- renderText({
@@ -248,13 +328,15 @@ server <- shinyServer(function(input, output) {
       V(SPADEdata)$expression <- all_data[,c(input$expression)]
       plot(SPADEdata, vertex.label.cex = 0.5,vertex.label.color = "black",
            vertex.color = c("royalblue3", "dodgerblue1", "darkorchid1", "chocolate1", "brown1")[1+(V(SPADEdata)$expression > (mean(V(SPADEdata)$expression)) - (sd(V(SPADEdata)$expression)))+
-                                                                                   (V(SPADEdata)$expression > mean(V(SPADEdata)$expression))+
-                                                                                   (V(SPADEdata)$expression > (mean(V(SPADEdata)$expression)) + (sd(V(SPADEdata)$expression)))] )
+                                                                                                  (V(SPADEdata)$expression > mean(V(SPADEdata)$expression))+
+                                                                                                  (V(SPADEdata)$expression > (mean(V(SPADEdata)$expression)) + (sd(V(SPADEdata)$expression)))] )
       })
     output$done <- renderText({
       print("Complete!")
     })
   })
+  
+  #plot forceAtlas clustering with user input coulouring
   
   observeEvent(input$plotnetworkforce, {
     
@@ -263,11 +345,6 @@ server <- shinyServer(function(input, output) {
     })
     output$Networkforce <- renderPlot({
       set.seed(1)
-      
-      forcedirected<<-layout.forceatlas2(adjgraph.sp, directed = FALSE, iterations = 1000,
-                                         linlog = input$linlog, pos = NULL, nohubs = input$hubs, k = input$repel, gravity = input$gravity,
-                                         ks = input$ks, ksmax = input$ksmax, delta = 1, center = NULL,
-                                         plotlabels = TRUE )                                                                                                             
       
       V(adjgraph.sp)$expression <- all_data[,c(input$expression)]
       plot(adjgraph.sp, layout = forcedirected, vertex.label.cex = 0.5,vertex.label.color = "black",
@@ -292,11 +369,15 @@ server <- shinyServer(function(input, output) {
     })
   })
   
+  #plot phenotype of given cluster
+  
   observeEvent(input$plotphe, {
     output$Phenotype <- renderPlot({
       PHESPADE(s1, input$kvalue, input$clusternumber, input$mkrs2)
     })
   })
 })
+# END SERVER  ///////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 shinyApp(ui = ui, server = server)
 
